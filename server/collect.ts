@@ -273,8 +273,10 @@ async function readGpu(): Promise<VitalsSnapshot["gpu"]> {
       return { available: false, error: "amdgpu sysfs requires a Linux host.", cards: [] };
     }
     const entries = await fs.readdir("/sys/class/drm", { withFileTypes: true });
+    // card* nodes are symlinks into the device tree — Dirent.isDirectory() is
+    // false for them, so match on the name and let the per-card read fail out.
     const cards = entries
-      .filter((entry) => entry.isDirectory() && /^card\d+$/.test(entry.name))
+      .filter((entry) => /^card\d+$/.test(entry.name))
       .map((entry) => entry.name)
       .sort();
     const rows = await Promise.all(cards.map(async (card): Promise<VitalsSnapshot["gpu"]["cards"][number] | null> => {
