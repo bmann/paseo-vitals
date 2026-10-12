@@ -364,7 +364,7 @@ export function VitalsSurface({ theme, host, layout, navigation }: PluginSurface
           <Section theme={theme} title="Storage">
             <View style={{ padding: 14, gap: 8 }}>
               <View style={{ flexDirection: "row", gap: 10 }}>
-                <Text style={{ color: theme.colors.foreground, fontWeight: "600", flex: 1 }}>Root filesystem</Text>
+                <Text style={{ color: theme.colors.foreground, fontWeight: "600", flex: 1 }}>/home filesystem</Text>
                 <Text style={{ color: theme.colors.foreground, fontVariant: ["tabular-nums"] }}>
                   {formatBytes(data.disk.usedBytes)} / {formatBytes(data.disk.totalBytes)}
                 </Text>
