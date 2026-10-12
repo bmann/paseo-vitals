@@ -246,12 +246,15 @@ async function readMemory() {
 
 async function readDisk(): Promise<VitalsSnapshot["disk"]> {
   try {
-    const stats = await fs.statfs("/");
+    // Report the filesystem the user actually works in (e.g. /home on
+    // SteamOS, where the root filesystem is a small read-only image).
+    const target = os.homedir();
+    const stats = await fs.statfs(target);
     const totalBytes = stats.blocks * stats.bsize;
     const availableBytes = stats.bavail * stats.bsize;
     const usedBytes = Math.max(0, totalBytes - stats.bfree * stats.bsize);
     return {
-      path: "/",
+      path: target,
       totalBytes,
       usedBytes,
       availableBytes,
