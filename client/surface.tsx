@@ -376,6 +376,45 @@ export function VitalsSurface({ theme, host, layout, navigation }: PluginSurface
             </View>
           </Section>
 
+          <Section theme={theme} title="Kata issues" note="Local bound projects">
+            {!data.kata.available ? (
+              <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12, padding: 14 }}>
+                {data.kata.error ?? "kata is unavailable."}
+              </Text>
+            ) : data.kata.projects.length === 0 ? (
+              <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12, padding: 14 }}>
+                No kata projects in the local ledger.
+              </Text>
+            ) : (
+              data.kata.projects.map((project) => (
+                <View key={project.name}>
+                  <Divider theme={theme} />
+                  <Text
+                    style={{
+                      color: theme.colors.foregroundMuted,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                      textTransform: "uppercase",
+                      paddingHorizontal: 14,
+                      paddingTop: 10,
+                    }}
+                  >
+                    {project.name} · {project.issues.length} issues
+                  </Text>
+                  {project.issues.map((issue) => (
+                    <MetricRow
+                      key={issue.shortId}
+                      theme={theme}
+                      title={`${issue.blocked ? "●" : "○"} ${issue.shortId} · ${issue.title}`}
+                      detail={[issue.owner ? `owner ${issue.owner}` : "unowned", ...issue.labels].join(" · ")}
+                      value={`P${issue.priority}`}
+                    />
+                  ))}
+                </View>
+              ))
+            )}
+          </Section>
+
           {data.warnings.map((warning) => (
             <Text key={warning} style={{ color: theme.colors.statusWarning, fontSize: 12 }}>{warning}</Text>
           ))}

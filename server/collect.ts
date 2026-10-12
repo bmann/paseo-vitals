@@ -353,13 +353,72 @@ async function readDocker(): Promise<VitalsSnapshot["docker"]> {
   }
 }
 
+interface KataIssueJson {
+  short_id?: string;
+  title?: string;
+  status?: string;
+  priority?: number;
+  blocked?: boolean;
+  owner?: string | null;
+  labels?: string[];
+  parent?: { short_id?: string } | null;
+}
+
+interface KataProjectJson {
+  name?: string;
+  active?: boolean;
+}
+
+async function readKata(): Promise<VitalsSnapshot["kata"]> {
+  try {
+    const options = { timeout: 4_000, maxBuffer: 4 * 1024 * 1024 };
+    const projectsRaw = JSON.parse(
+      (await execFileAsync("kata", ["projects", "list", "--json"], options)).stdout,
+    ) as { projects?: KataProjectJson[] };
+    const names = (projectsRaw.projects ?? [])
+      .filter((project) => project.active !== false && project.name)
+      .map((project) => project.name!);
+    const projects = await Promise.all(names.map(async (name) => {
+      try {
+        const issuesRaw = JSON.parse(
+          (await execFileAsync("kata", ["list", "--project", name, "--json"], options)).stdout,
+        ) as { issues?: KataIssueJson[] };
+        const issues = (issuesRaw.issues ?? [])
+          .map((issue) => ({
+            shortId: issue.short_id ?? "?",
+            title: issue.title ?? "Untitled",
+            priority: Math.max(0, Math.min(4, issue.priority ?? 4)),
+            status: issue.status ?? "open",
+            blocked: issue.blocked === true,
+            owner: issue.owner ?? null,
+            labels: issue.labels ?? [],
+            parentShortId: issue.parent?.short_id ?? null,
+          }))
+          .sort((a, b) => a.priority - b.priority || a.shortId.localeCompare(b.shortId));
+        return { name, issues };
+      } catch {
+        // One unreadable project should not hide the rest of the ledger.
+        return { name, issues: [] as VitalsSnapshot["kata"]["projects"][number]["issues"] };
+      }
+    }));
+    return { available: true, error: null, projects };
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+    const message = code === "ENOENT"
+      ? "kata is not installed on this host."
+      : "kata is unavailable (is its daemon running?).";
+    return { available: false, error: message, projects: [] };
+  }
+}
+
 async function collectUncached(agents: PaseoAgent[]): Promise<VitalsSnapshot> {
   const warnings: string[] = [];
-  const [rows, memory, disk, docker] = await Promise.all([
+  const [rows, memory, disk, docker, kata] = await Promise.all([
     readProcesses(),
     readMemory(),
     readDisk(),
     readDocker(),
+    readKata(),
   ]);
   const cpu = cpuValues(rows);
   const daemonPid = findDaemonPid(rows);
@@ -421,6 +480,7 @@ async function collectUncached(agents: PaseoAgent[]): Promise<VitalsSnapshot> {
       agents: agentUsage,
     },
     docker,
+    kata,
     largestProcesses: [...rows]
       .sort((a, b) => b.rssBytes - a.rssBytes)
       .slice(0, 8)

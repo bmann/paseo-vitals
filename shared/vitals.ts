@@ -76,6 +76,23 @@ export const vitalsSnapshot = defineRpc({
       memoryBytes: z.number().nonnegative(),
       containers: z.array(ContainerUsageSchema),
     }),
+    kata: z.object({
+      available: z.boolean(),
+      error: z.string().nullable(),
+      projects: z.array(z.object({
+        name: z.string(),
+        issues: z.array(z.object({
+          shortId: z.string(),
+          title: z.string(),
+          priority: z.number().int().min(0).max(4),
+          status: z.string(),
+          blocked: z.boolean(),
+          owner: z.string().nullable(),
+          labels: z.array(z.string()),
+          parentShortId: z.string().nullable(),
+        })),
+      })),
+    }),
     largestProcesses: z.array(z.object({
       pid: z.number().int().positive(),
       name: z.string(),
