@@ -265,6 +265,45 @@ async function readDisk(): Promise<VitalsSnapshot["disk"]> {
   }
 }
 
+async function readGpu(): Promise<VitalsSnapshot["gpu"]> {
+  // amdgpu exposes VRAM/GTT accounting in sysfs — no rocm-smi needed. This is
+  // where local models commit on shared-memory hosts (e.g. Navi 33 + 15 GiB RAM).
+  try {
+    if (process.platform !== "linux") {
+      return { available: false, error: "amdgpu sysfs requires a Linux host.", cards: [] };
+    }
+    const entries = await fs.readdir("/sys/class/drm", { withFileTypes: true });
+    const cards = entries
+      .filter((entry) => entry.isDirectory() && /^card\d+$/.test(entry.name))
+      .map((entry) => entry.name)
+      .sort();
+    const rows = await Promise.all(cards.map(async (card): Promise<VitalsSnapshot["gpu"]["cards"][number] | null> => {
+      try {
+        const base = `/sys/class/drm/${card}/device`;
+        const read = async (file: string) => Number((await fs.readFile(`${base}/${file}`, "utf8")).trim());
+        const [vramTotalBytes, vramUsedBytes, gttTotalBytes, gttUsedBytes] = await Promise.all([
+          read("mem_info_vram_total"),
+          read("mem_info_vram_used"),
+          read("mem_info_gtt_total"),
+          read("mem_info_gtt_used"),
+        ]);
+        if (![vramTotalBytes, vramUsedBytes, gttTotalBytes, gttUsedBytes].every(Number.isFinite)) return null;
+        if (vramTotalBytes === 0 && gttTotalBytes === 0) return null;
+        return { device: card, vramTotalBytes, vramUsedBytes, gttTotalBytes, gttUsedBytes };
+      } catch {
+        return null; // Not an amdgpu card, or no mem_info files — skip it.
+      }
+    }));
+    const found = rows.filter((row): row is NonNullable<typeof row> => row !== null);
+    if (found.length === 0) {
+      return { available: false, error: "No amdgpu memory info found in /sys/class/drm.", cards: [] };
+    }
+    return { available: true, error: null, cards: found };
+  } catch {
+    return { available: false, error: "amdgpu sysfs is unavailable.", cards: [] };
+  }
+}
+
 interface DockerStat {
   ID?: string;
   Name?: string;
@@ -413,12 +452,13 @@ async function readKata(): Promise<VitalsSnapshot["kata"]> {
 
 async function collectUncached(agents: PaseoAgent[]): Promise<VitalsSnapshot> {
   const warnings: string[] = [];
-  const [rows, memory, disk, docker, kata] = await Promise.all([
+  const [rows, memory, disk, docker, kata, gpu] = await Promise.all([
     readProcesses(),
     readMemory(),
     readDisk(),
     readDocker(),
     readKata(),
+    readGpu(),
   ]);
   const cpu = cpuValues(rows);
   const daemonPid = findDaemonPid(rows);
@@ -481,6 +521,7 @@ async function collectUncached(agents: PaseoAgent[]): Promise<VitalsSnapshot> {
     },
     docker,
     kata,
+    gpu,
     largestProcesses: [...rows]
       .sort((a, b) => b.rssBytes - a.rssBytes)
       .slice(0, 8)

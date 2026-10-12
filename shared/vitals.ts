@@ -58,6 +58,17 @@ export const vitalsSnapshot = defineRpc({
       availableBytes: z.number().nonnegative(),
       usedPercent: z.number().nonnegative(),
     }),
+    gpu: z.object({
+      available: z.boolean(),
+      error: z.string().nullable(),
+      cards: z.array(z.object({
+        device: z.string(),
+        vramTotalBytes: z.number().nonnegative(),
+        vramUsedBytes: z.number().nonnegative(),
+        gttTotalBytes: z.number().nonnegative(),
+        gttUsedBytes: z.number().nonnegative(),
+      })),
+    }),
     paseo: z.object({
       daemonPid: z.number().int().positive().nullable(),
       daemonRssBytes: z.number().nonnegative(),

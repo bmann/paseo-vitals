@@ -361,6 +361,48 @@ export function VitalsSurface({ theme, host, layout, navigation }: PluginSurface
             ))}
           </Section>
 
+          {data.gpu.available && data.gpu.cards.length > 0 ? (
+            data.gpu.cards.map((card) => {
+              const vramPercent = card.vramTotalBytes > 0 ? (card.vramUsedBytes / card.vramTotalBytes) * 100 : 0;
+              const gttPercent = card.gttTotalBytes > 0 ? (card.gttUsedBytes / card.gttTotalBytes) * 100 : 0;
+              return (
+                <Section
+                  key={card.device}
+                  theme={theme}
+                  title="GPU memory"
+                  note={`${card.device} · amdgpu sysfs · VRAM is where local models commit`}
+                >
+                  <View style={{ padding: 14, gap: 8 }}>
+                    <View style={{ flexDirection: "row", gap: 10 }}>
+                      <Text style={{ color: theme.colors.foreground, fontWeight: "600", flex: 1 }}>VRAM</Text>
+                      <Text style={{ color: theme.colors.foreground, fontVariant: ["tabular-nums"] }}>
+                        {formatBytes(card.vramUsedBytes)} / {formatBytes(card.vramTotalBytes)}
+                      </Text>
+                    </View>
+                    <Bar theme={theme} value={vramPercent} />
+                    <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>
+                      {formatBytes(card.vramTotalBytes - card.vramUsedBytes)} free · {vramPercent.toFixed(1)}% used
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 6 }}>
+                      <Text style={{ color: theme.colors.foreground, fontWeight: "600", flex: 1 }}>
+                        GTT (shared with system RAM)
+                      </Text>
+                      <Text style={{ color: theme.colors.foreground, fontVariant: ["tabular-nums"] }}>
+                        {formatBytes(card.gttUsedBytes)} / {formatBytes(card.gttTotalBytes)}
+                      </Text>
+                    </View>
+                    <Bar theme={theme} value={gttPercent} />
+                    <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>
+                      {formatBytes(card.gttTotalBytes - card.gttUsedBytes)} free · {gttPercent.toFixed(1)}% used
+                    </Text>
+                  </View>
+                </Section>
+              );
+            })
+          ) : data.gpu.error ? (
+            <Text style={{ color: theme.colors.foregroundMuted, fontSize: 12 }}>{data.gpu.error}</Text>
+          ) : null}
+
           <Section theme={theme} title="Storage">
             <View style={{ padding: 14, gap: 8 }}>
               <View style={{ flexDirection: "row", gap: 10 }}>
